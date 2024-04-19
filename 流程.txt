@@ -1,0 +1,4 @@
+cd D:\tw_stocker-main
+git add .
+git commit -m "Add"
+git push origin main
