@@ -1,4 +1,8 @@
 cd D:\tw_stocker-main
 git add .
 git commit -m "Add"
-git push origin main
+git push origin main 
+(若push偶爾出錯，先改用
+git pull origin main
+再
+git push origin main)
