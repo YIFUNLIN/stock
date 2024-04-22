@@ -9,7 +9,7 @@
         body {
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start; /* 修改此處，使內容從頂部開始對齊 */
             height: 100vh;
             background-color: #f5f5f5;
         }
@@ -18,7 +18,7 @@
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            width: 80%; /* Adjust width based on your preference */
+            min-height: 100vh; /* 確保容器至少與視窗一樣高 */
         }
         .header {
             color: #26a69a; /* Materialize teal accent */
