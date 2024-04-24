@@ -27,7 +27,7 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
     else:
         start_date = today - timedelta(days=59)
 
-    end_date = today + timedelta(hours=14)
+    end_date = today + timedelta(hours=14)  # 作者是改這行
     yf_data = vbt.YFData.download(
         f"{stock_num}.TW",
         start=start_date.strftime('%Y-%m-%d %H:%M:%S'),
