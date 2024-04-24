@@ -36,7 +36,7 @@ def get_data_since_last_record(stock_num, base_path='./data/'): #  函式負責�
     else:
         start_date = today - timedelta(days=59)
 
-    end_date = today - timedelta(minutes=5)  # 每天會更新到13:55才停止 (資料的結束時間設定為當前時間減去五分鐘，以確保資料的可用性和完整性。)
+    end_date = today + timedelta(hours=14)
 
     yf_data = vbt.YFData.download(
         f"{stock_num}.TW",
