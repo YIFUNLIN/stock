@@ -8,8 +8,6 @@ import twstock
 
 codes = twstock.codes
 
-# 都是自行整理資料成csv的
-# 從 Yahoo Finance 下載特定台灣上市股票或 ETF 的近期交易數據，並將這些數據保存到 CSV 文件中
 
 def get_past_x_days(stock_num, days=59):
     csv_path = f'./data/{stock_num}.csv'
