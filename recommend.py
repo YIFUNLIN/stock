@@ -59,6 +59,7 @@ parameters = {
     "high_rsi": 70,
     "ema_period": 26,
 }
+
 for i in nlp2.get_files_from_dir("data"):
     try:
         url = i
