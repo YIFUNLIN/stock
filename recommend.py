@@ -1,9 +1,17 @@
 import nlp2
 import pandas as pd
+import  numpy as np
 from jinja2 import Environment, FileSystemLoader
 
-from strategy.grid import trade
+from strategy.grid import trade # 匯入自定義的交易策略
 
+# 從多個股票的數據文件中生成買賣推薦，並將推薦結果生成報告
+
+def calculate_sharpe_ratio(returns, risk_free_rate=0.01):
+    mean_return = np.mean(returns)
+    std_dev = np.std(returns)
+    sharpe_ratio = (mean_return - risk_free_rate) / std_dev
+    return sharpe_ratio
 
 def recommend_stock(url, parameters):
     df = pd.read_csv(url, index_col='Datetime')
@@ -16,20 +24,25 @@ def recommend_stock(url, parameters):
 
     states_buy, states_sell, states_entry, states_exit, total_gains, invest = trade(df, **parameters)
 
+    # 計算 Sharpe Ratio
+    returns = df['close'].pct_change().dropna()
+    sharpe_ratio = calculate_sharpe_ratio(returns)
+
     today = len(df)
     today_close_price = df.close.iloc[-1]
 
     should_buy = abs(today - states_buy[-1]) < 27
     should_sell = abs(today - states_sell[-1]) < 27
 
-    return should_buy, should_sell, today_close_price, total_gains
+    return should_buy, should_sell, today_close_price, total_gains, sharpe_ratio
+
 
 
 def generate_report(urls, parameters, limit=10):
     results = []
     for url in urls:
         try:
-            should_buy, should_sell, today_close_price, total_gains = recommend_stock(url, parameters)
+            should_buy, should_sell, today_close_price, total_gains, sharpe_ratio = recommend_stock(url, parameters)
             if should_sell or should_buy:
                 results.append({
                     "Stock": url.split('/')[-1].split('.')[0],
@@ -37,19 +50,27 @@ def generate_report(urls, parameters, limit=10):
                     "Should_Sell": should_sell,
                     "Recommended_Price": today_close_price,
                     "Total_Gains": total_gains,
+                    "Sharpe_Ratio": sharpe_ratio,
                 })
         except Exception as e:
             pass
 
-    # 排序並選擇前10檔股票，假設是根據推薦價格排序
     sorted_results = sorted(results, key=lambda x: x['Total_Gains'], reverse=True)[:limit]
-
+    
     df = pd.DataFrame(sorted_results)
-    env = Environment(loader=FileSystemLoader('templates'))
-    template = env.get_template('stock_report_template.html')
-    html_output = template.render(stocks=df.to_dict(orient='records'))
+    env = Environment(loader=FileSystemLoader('templates')) # 指定了模板文件所在的目錄
+    template = env.get_template('stock_report_template.html') # 載入模板文件，包含了生成報告所需的HTML結構和Jinja2佔位符
+    html_output = template.render(stocks=df.to_dict(orient='records')) # 將 Jinja2 模板中的內容渲染成完整的 HTML 文件，並將數據插入到相應的位置，並將結果寫入stock_report.html文件中
+    """
+    - 接收數據：這裡的 template.render() 方法用來渲染模板，其中的 stocks 參數是傳遞給模板的數據。
+    df.to_dict(orient='records') 將 pandas DataFrame 轉換成一個列表作為 stocks 參數傳遞給模板，列表中的每一個元素是一個字典，代表一支股票及其相關的數據。這些數據會填充到模板文件中的對應位置
 
-    with open('stock_report.html', 'w') as f:
+    - 填充佔位符：將模板中 {% for stock in stocks %} 迴圈內的佔位符 {{ stock.Stock }}, {{ stock.Should_Buy }}, {{ stock.Should_Sell }}, {{ stock.Recommended_Price }}，以及 {{ stock.Stock }} 用實際的數據來替換。
+    - 生成完整的 HTML：Jinja2 會生成一個包含所有股票數據的完整 HTML 文件，這個文件就是渲染後的 html_output
+    """
+
+
+    with open('stock_report.html', 'w') as f:  # 最後將程式碼渲染後的 HTML 內容寫入一個新的文件 stock_report.html 中
         f.write(html_output)
 
 
@@ -60,7 +81,7 @@ parameters = {
     "ema_period": 26,
 }
 
-for i in nlp2.get_files_from_dir("data"):
+for i in nlp2.get_files_from_dir("data"): # 獲取所有股票數據文件的URL，對每個文件執行recommend_stock函數來生成買賣信號並打印結果
     try:
         url = i
         should_buy, should_sell, today_close_price = recommend_stock(url, parameters)
@@ -69,4 +90,4 @@ for i in nlp2.get_files_from_dir("data"):
                 f"{i.split('/')[-1].split('.')[0]} Should buy today: {should_buy}, Should sell today: {should_sell}, Recommended price: {today_close_price}")
     except Exception as e:
         pass
-generate_report(list(nlp2.get_files_from_dir("data")), parameters)
+generate_report(list(nlp2.get_files_from_dir("data")), parameters) # 最後調用generate_report函數生成一個包含所有推薦結果的報告，報告結果寫入stock_report.html文件中
