@@ -1,82 +1,118 @@
-<!--第一個.html文件是用來作為模板的-->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <title>股票買賣推薦報表</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-    <link href="https://fonts.googleapis.com/css?family=Noto+Sans+TC&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            height: 100vh;
-            background: linear-gradient(to right, #188cb6 0%, #24a3ca 100%);
             font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
         }
         .container {
             background: white;
             padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 6px 10px rgba(0,0,0,0.15);
-            width: 80%;
-            min-height: 100vh;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-top: 50px;
+            margin-bottom: 50px;
         }
         .header {
-            color: #d84315;
-            text-align: center;
+            color: #1976d2;
+            font-weight: 700;
             margin-bottom: 30px;
         }
-        .responsive-table {
-            overflow-x: auto;
+        .sub-header {
+            color: #616161;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
         }
-        table.highlight > tbody > tr {
-            transition: background-color .25s ease;
+        .card {
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card-content {
+            padding: 24px;
         }
         table.highlight > tbody > tr:hover {
-            background-color: #f2f2f2;
+            background-color: #e3f2fd;
         }
         th {
-            font-size: 16px;
-            font-weight: bold;
+            background-color: #1976d2;
+            color: white;
+            font-weight: 500;
+            text-align: center !important;
         }
-        td, th {
-            padding: 15px 15px;
+        td {
             text-align: center;
+        }
+        .btn-floating {
+            background-color: #1976d2;
+        }
+        .btn-floating:hover {
+            background-color: #1565c0;
+        }
+        @media only screen and (max-width: 992px) {
+            .container {
+                width: 95%;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="header">股票買賣 - 推薦系統 </h2>
-        <h5 style="text-align: center;"> 使用技術指標輔助判斷，自我學習用途，不構成任何投資建議 ! </h5> <br>
-        <h5 style="text-align: center;">  每日14:00 - 15:00 更新當日收盤價格 </h5> <br>
-        <h5 style="text-align: center;"> 每日00:00 - 01:00 更新買賣訊號 </h5> <br>
-        <table class="highlight responsive-table">
-            <thead>
-                <tr>
-                    <th>股票</th>
-                    <th>是否買入</th>
-                    <th>是否賣出</th>
-                    <th>收盤價格</th>
-                    <th>詳細資訊</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- 這裡使用 Jinja2 模板語言來迭代股票資料 -->
-                {% for stock in stocks %}
-                <tr>
-                    <td>{{ stock.Stock }}</td>
-                    <td>{{ stock.Should_Buy }}</td>
-                    <td>{{ stock.Should_Sell }}</td>
-                    <td>{{ stock.Recommended_Price }}</td>
-                    <td><a href="https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID={{ stock.Stock }}" target="_blank">查看</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <h2 class="header center-align">股票買賣推薦系統</h2>
+        <div class="card">
+            <div class="card-content">
+                <p class="sub-header center-align">使用技術指標輔助判斷，自我學習用途，不構成任何投資建議！</p>
+                <p class="sub-header center-align">每日14:00 - 15:00 更新當日收盤價格</p>
+                <p class="sub-header center-align">每日00:00 - 01:00 更新買賣訊號</p>
+            </div>
+        </div>
+        <div class="responsive-table">
+            <table class="highlight centered">
+                <thead>
+                    <tr>
+                        <th>股票</th>
+                        <th>是否買入</th>
+                        <th>是否賣出</th>
+                        <th>收盤價格</th>
+                        <th>詳細資訊</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stock in stocks %}
+                    <tr>
+                        <td>{{ stock.Stock }}</td>
+                        <td>
+                            {% if stock.Should_Buy == 'Yes' %}
+                                <i class="material-icons green-text">check_circle</i>
+                            {% else %}
+                                <i class="material-icons red-text">cancel</i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if stock.Should_Sell == 'Yes' %}
+                                <i class="material-icons green-text">check_circle</i>
+                            {% else %}
+                                <i class="material-icons red-text">cancel</i>
+                            {% endif %}
+                        </td>
+                        <td>{{ stock.Recommended_Price }}</td>
+                        <td>
+                            <a href="https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID={{ stock.Stock }}" target="_blank" class="btn-floating pulse">
+                                <i class="material-icons">info</i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 </body>
