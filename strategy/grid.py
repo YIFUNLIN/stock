@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-def trade(real_movement, initial_money=10000, rsi_period=14, low_rsi=30, high_rsi=70, ema_period=26, print_log=False):
+def trade(real_movement, initial_money=10000, rsi_period=14, low_rsi=40, high_rsi=60, ema_period=26, print_log=False):
     money = initial_money
     states_buy = []
     states_sell = []

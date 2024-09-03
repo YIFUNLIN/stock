@@ -31,7 +31,7 @@ def calculate_markov_chain(data): # 在每次進行買入或賣出決策之前�
 
     return transition_matrix
 
-def trade(real_movement, delay=5, initial_state=1, initial_money=10000, max_buy=1, max_sell=1, print_log=True):
+def trade(real_movement, delay=3, initial_state=1, initial_money=10000, max_buy=1, max_sell=1, print_log=True):
     """
     根據市場價格變動進行股票買賣模擬
     :param real_movement: 市場價格的真實變動序列 (假定此為DataFrame且包含時間戳索引)
@@ -62,7 +62,7 @@ def trade(real_movement, delay=5, initial_state=1, initial_money=10000, max_buy=
         prob_down = transition_matrix[current_state]['Down']
 
         if state == 1 and current_price < real_movement.iloc[i - 1]:  # 考慮買入
-            if current_decision >= delay and prob_up > prob_down:  # 如果馬可夫鏈預測上升的概率高
+            if current_decision >= delay and prob_up > prob_down * 0.9:  # 放寬判斷門檻
                 shares = min(initial_money // current_price, max_buy)
                 if shares > 0:
                     initial_money -= shares * current_price
@@ -75,7 +75,7 @@ def trade(real_movement, delay=5, initial_state=1, initial_money=10000, max_buy=
                 current_decision += 1
 
         elif state == 0 and current_price > real_movement.iloc[i - 1]:  # 考慮賣出
-            if current_decision >= delay and prob_down > prob_up:  # 如果馬可夫鏈預測下降的概率高
+            if current_decision >= delay and prob_down > prob_up * 0.9:  # 放寬判斷門檻
                 sell_units = min(current_inventory, max_sell)
                 if sell_units > 0:
                     initial_money += sell_units * current_price
