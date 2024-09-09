@@ -22,7 +22,7 @@ def recommend_stock(url, parameters):
     df['close'] = pd.to_numeric(df['close'], errors='coerce')
     df['volume'] = pd.to_numeric(df['volume'], errors='coerce')
 
-    states_buy, states_sell, states_entry, states_exit, total_gains, invest = trade(df, **parameters)
+    states_buy, states_sell, states_entry, states_exit, total_gains, invest = trade(df, **parameters) # 基於每支股票的數據計算買入和賣出的信號（通過 RSI、EMA、RSI)
 
     # 計算 Sharpe Ratio
     returns = df['close'].pct_change().dropna()
@@ -31,14 +31,18 @@ def recommend_stock(url, parameters):
     today = len(df)
     today_close_price = df.close.iloc[-1]
 
-    should_buy = abs(today - states_buy[-1]) < 27
-    should_sell = abs(today - states_sell[-1]) < 27
+    # 確保推薦的股票買賣信號是近期且有效的，而不是基於很久以前發出的信號
+    # 如果某個股票的買入信號距離今天已經超過 27 天，這意味著市場情況可能已經變化，該信號可能不再有效或適合，因此不再推薦它買入。
+    # 同理，如果賣出信號距離今天超過 27 天，該信號可能也已經過期，賣出的建議就不應再被強烈推薦
 
-    return should_buy, should_sell, today_close_price, total_gains, sharpe_ratio
+    should_buy = abs(today - states_buy[-1]) < 27     #  計算的是最近一次買入操作距離今天的天數。如果這個值小於 27，則說明這個買入信號是最近 27 天內產生的，判斷它仍然有效，因此將其設為 should_buy = True
+    should_sell = abs(today - states_sell[-1]) < 27   # 如果最近一次賣出操作距離今天小於 27 天，則表示這個賣出信號仍然有效，因此設為 should_sell = True
+
+    return should_buy, should_sell, today_close_price, total_gains, sharpe_ratio # 前兩個回傳True or False
 
 
-
-def generate_report(urls, parameters, limit=10):
+# 網頁前端顯示
+def generate_report(urls, parameters, limit=30):
     results = []
     for url in urls:
         try:
