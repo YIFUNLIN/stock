@@ -89,14 +89,14 @@
                     <tr>
                         <td>{{ stock.Stock }}</td>
                         <td>
-                            {% if stock.Should_Buy == 'Yes' %}
+                            {% if stock.Should_Buy %}
                                 <i class="material-icons green-text">check_circle</i>
                             {% else %}
                                 <i class="material-icons red-text">cancel</i>
                             {% endif %}
                         </td>
                         <td>
-                            {% if stock.Should_Sell == 'Yes' %}
+                            {% if stock.Should_Sell %}
                                 <i class="material-icons green-text">check_circle</i>
                             {% else %}
                                 <i class="material-icons red-text">cancel</i>
