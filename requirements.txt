@@ -7,3 +7,5 @@ jinja2
 pandas
 requests
 nlp2
+tensorflow==2.12.0
+numpy
