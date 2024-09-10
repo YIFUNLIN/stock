@@ -2,7 +2,6 @@ import nlp2
 import pandas as pd
 import  numpy as np
 from jinja2 import Environment, FileSystemLoader
-
 from strategy.grid import trade # 匯入自定義的交易策略
 
 # 從多個股票的數據文件中生成買賣推薦，並將推薦結果生成報告
@@ -77,12 +76,15 @@ def generate_report(urls, parameters, limit=30):
     with open('stock_report.html', 'w') as f:  # 最後將程式碼渲染後的 HTML 內容寫入一個新的文件 stock_report.html 中
         f.write(html_output)
 
-
+# 制定交易策略的參數
 parameters = {
+    "initial_money":100000,
     "rsi_period": 14,
-    "low_rsi": 30,
-    "high_rsi": 70,
+    "low_rsi": 20,
+    "high_rsi": 80,
     "ema_period": 26,
+    "cool_down_period":1,
+    "print_log":False
 }
 
 for i in nlp2.get_files_from_dir("data"): # 獲取所有股票數據文件的URL，對每個文件執行recommend_stock函數來生成買賣信號並打印結果
