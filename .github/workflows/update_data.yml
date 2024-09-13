@@ -2,32 +2,30 @@ name: Update Data
 
 on:
   schedule:
-    - cron: "0 6 * * *" # 每天UTC时间6点，即北京时间下午2点
-  workflow_dispatch:
-
+    - cron: "0 6 * * *" # 每天UTC時間6點執行，即UTC+8時間下午2點 github actions會自動觸發。實際上好像14:20才自動更新
+  workflow_dispatch: # 允許手動觸發
 jobs:
   update-and-commit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # 運行環境(runners)
 
-    steps:
+    steps: # 官方的 GitHub Action配置
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v2
         with:
           python-version: "3.x"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Update data
-        run: python update.py
+        run: python update.py # 執行該腳本
 
-      - name: Commit and push if changes
-        run: |
+      - name: Commit and push if changes # 完成資料更新後，腳本檢查是否有資料變更
+        run: | # 如果有，將變更提交到 Git 倉庫並推送到 GitHub
           git config --global user.email "drose01rrr@gmail.com"
           git config --global user.name "YIFUNLIN"
           git add -A
