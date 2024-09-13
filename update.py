@@ -17,53 +17,53 @@ def clean_csv(csv_path):
 
     with open(csv_path, 'w') as file:
         for line in lines:
-            if len(line.strip()) > 0 and len(line.split(',')) == num_columns:
+            if len(line.split(',')) == num_columns:
                 file.write(line)
 
 def get_data_since_last_record(stock_num, base_path='./data/'):
     csv_path = f'{base_path}{stock_num}.csv'
     tz_taipei = pytz.timezone('Asia/Taipei')
+    today = datetime.now(tz_taipei).replace(hour=0, minute=0, second=0, microsecond=0)  # Reset to start of day
 
     if os.path.exists(csv_path):
-        clean_csv(csv_path)
-        data = pd.read_csv(csv_path)
+        try:
+            clean_csv(csv_path)  # Clean the CSV file before reading
+            data = pd.read_csv(csv_path, header=0)
+        except pd.errors.ParserError as e:
+            print(f"Parser error when reading CSV: {e}")
+            data = pd.DataFrame()  # Fallback to an empty DataFrame
+
         if not data.empty:
-            data['Datetime'] = pd.to_datetime(data['Datetime'])
-            data.set_index('Datetime', inplace=True)
-            data.index = data.index.tz_localize('UTC').tz_convert(tz_taipei)
-            last_record_date = data.index[-1]
-            start_date = last_record_date + timedelta(days=1)
+            try:
+                last_record_date = pd.to_datetime(data['Datetime'].iloc[-1]).tz_convert('Asia/Taipei')
+                start_date = last_record_date + timedelta(minutes=5)
+            except Exception as e:
+                print(f"Error parsing last record date: {e}")
+                start_date = today - timedelta(days=59)
         else:
-            start_date = datetime.now(tz_taipei) - timedelta(days=60)
+            start_date = today - timedelta(days=59)
     else:
-        start_date = datetime.now(tz_taipei) - timedelta(days=60)
+        start_date = today - timedelta(days=59)
 
-    end_date = datetime.now(tz_taipei) - timedelta(minutes=30)  # 確保資料已更新，減去30分鐘
-
+    end_date = today + timedelta(hours=14)
     yf_data = vbt.YFData.download(
         f"{stock_num}.TW",
-        start=start_date,
-        end=end_date,
-        interval='1d',
-        missing_index='drop',
-        timezone='Asia/Taipei'
+        start=start_date.strftime('%Y-%m-%d %H:%M:%S'),
+        end=end_date.strftime('%Y-%m-%d %H:%M:%S'),
+        interval='5m',
+        missing_index='drop'
     )
 
     new_data = yf_data.get()
-    if new_data.empty:
-        print(f"No new data for {stock_num}")
-        return
-
-    new_data.reset_index(inplace=True)
-    new_data['Datetime'] = new_data['Datetime'].dt.tz_convert('Asia/Taipei')
 
     if os.path.exists(csv_path):
-        new_data.to_csv(csv_path, mode='a', header=False, index=False)
+        new_data.to_csv(csv_path, mode='a', header=False)
     else:
-        new_data.to_csv(csv_path, index=False)
+        new_data.to_csv(csv_path)
 
-    print(f"Updated data for {stock_num}")
+    return new_data
 
 for k, v in codes.items():
     if v.market == '上市' and (v.type == '股票' or v.type == 'ETF'):
-        get_data_since_last_record(k)
+        new_data = get_data_since_last_record(k)
+        print(f"Updated data for {k}")
