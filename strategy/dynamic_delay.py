@@ -81,12 +81,10 @@ def trade_with_lstm(real_movement, lstm_model, scaler, time_steps=60, initial_mo
     real_movement_values = real_movement['close'].values
     dates = real_movement.index
 
-    # 計算馬可夫鏈的狀態轉移矩陣
-    transition_matrix = calculate_markov_chain(real_movement_values)
-    current_state = 'Stable'  # 假設初始狀態為穩定
-
     # 預處理LSTM所需的數據
-    inputs = scaler.transform(real_movement.drop(['date'], axis=1).values)
+    features = ['close', 'MA5', 'MA20', 'RSI', 'MACD', 'MACD_signal']
+    data = real_movement[features].values
+    inputs = scaler.transform(data)
     X_test = []
     for i in range(time_steps, len(inputs)):
         X_test.append(inputs[i-time_steps:i])
@@ -94,7 +92,8 @@ def trade_with_lstm(real_movement, lstm_model, scaler, time_steps=60, initial_mo
 
     # 使用LSTM進行預測
     predicted_prices = lstm_model.predict(X_test)
-    predicted_prices = scaler.inverse_transform(np.hstack((predicted_prices, np.zeros((predicted_prices.shape[0], real_movement.shape[1]-1)))))[:,0]
+    # 由於我們的模型預測的是縮放後的價格，需要反轉縮放
+    predicted_prices = scaler.inverse_transform(np.hstack((predicted_prices, np.zeros((predicted_prices.shape[0], data.shape[1]-1)))))[:,0]
 
     # 開始交易模擬
     for i in range(len(predicted_prices)):
