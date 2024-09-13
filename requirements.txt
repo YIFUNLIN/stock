@@ -9,6 +9,3 @@ requests
 nlp2
 tensorflow
 numpy
-talib
-kerastuner
-pytz
