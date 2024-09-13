@@ -5,7 +5,8 @@ from jinja2 import Environment, FileSystemLoader
 from strategy.grid import trade_with_lstm  # 假設您已經在 strategy/grid.py 中實現了優化後的 trade_with_lstm 函數
 from sklearn.preprocessing import MinMaxScaler
 import talib as ta
-from tensorflow.keras.models import load_model
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
 
 # 計算夏普比率
 def calculate_sharpe_ratio(returns, risk_free_rate=0.01):
@@ -22,9 +23,7 @@ def calculate_max_drawdown(portfolio_values):
         if value > peak:
             peak = value
         drawdown = (peak - value) / peak
-        drawdowns.append(drawdown)
-    max_drawdown = max(drawdowns)
-    return max_drawdown
+    return max(drawdowns)
 
 # 添加技術指標
 def add_technical_indicators(df):
@@ -35,8 +34,35 @@ def add_technical_indicators(df):
     df.dropna(inplace=True)
     return df
 
+# 構建和訓練LSTM模型
+def build_and_train_lstm_model(data, time_steps=60):
+    # 準備數據
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaled_data = scaler.fit_transform(data)
+
+    X, y = [], []
+    for i in range(time_steps, len(scaled_data)):
+        X.append(scaled_data[i-time_steps:i])
+        y.append(scaled_data[i, 0])  # 預測收盤價
+
+    X, y = np.array(X), np.array(y)
+
+    # 構建模型
+    model = Sequential()
+    model.add(LSTM(units=50, return_sequences=True, input_shape=(X.shape[1], X.shape[2])))
+    model.add(Dropout(0.2))
+    model.add(LSTM(units=50))
+    model.add(Dropout(0.2))
+    model.add(Dense(units=1))
+    model.compile(optimizer='adam', loss='mean_squared_error')
+
+    # 訓練模型
+    model.fit(X, y, epochs=5, batch_size=32, verbose=0)  # 減少epochs，加快訓練速度
+
+    return model, scaler
+
 # 股票推薦函數
-def recommend_stock(url, parameters, lstm_model, scaler):
+def recommend_stock(url, parameters):
     df = pd.read_csv(url, index_col='Datetime', parse_dates=True)
     df.columns = map(str.lower, df.columns)
     df['open'] = pd.to_numeric(df['open'], errors='coerce')
@@ -51,6 +77,11 @@ def recommend_stock(url, parameters, lstm_model, scaler):
     # 確保有足夠的數據進行預測
     if len(df) < 100:
         return None
+
+    # 構建和訓練模型
+    features = ['close', 'MA5', 'MA20', 'RSI', 'MACD', 'MACD_signal']
+    data = df[features].values
+    lstm_model, scaler = build_and_train_lstm_model(data, time_steps=parameters['time_steps'])
 
     # 執行交易策略
     results = trade_with_lstm(df, lstm_model, scaler, **parameters)
@@ -67,11 +98,11 @@ def recommend_stock(url, parameters, lstm_model, scaler):
     return should_buy, should_sell, today_close_price, total_gains, invest, sharpe_ratio, max_drawdown
 
 # 生成報告函數
-def generate_report(urls, parameters, lstm_model, scaler, limit=30):
+def generate_report(urls, parameters, limit=30):
     results = []
     for url in urls:
         try:
-            recommendation = recommend_stock(url, parameters, lstm_model, scaler)
+            recommendation = recommend_stock(url, parameters)
             if recommendation is not None:
                 should_buy, should_sell, today_close_price, total_gains, invest, sharpe_ratio, max_drawdown = recommendation
                 if should_sell or should_buy:
@@ -90,7 +121,7 @@ def generate_report(urls, parameters, lstm_model, scaler, limit=30):
             pass
 
     sorted_results = sorted(results, key=lambda x: x['Total_Gains'], reverse=True)[:limit]
-    
+
     env = Environment(loader=FileSystemLoader('templates'))
     template = env.get_template('stock_report_template.html')
     html_output = template.render(stocks=sorted_results)
@@ -109,11 +140,5 @@ parameters = {
     "print_log": False
 }
 
-# 加載預訓練的LSTM模型和標準化器
-# 請確保您已經訓練並保存了LSTM模型和標準化器
-lstm_model = load_model('lstm_model.h5')
-with open('scaler.pkl', 'rb') as f:
-    scaler = pickle.load(f)
-
 # 生成報告
-generate_report(list(nlp2.get_files_from_dir("data")), parameters, lstm_model, scaler)
+generate_report(list(nlp2.get_files_from_dir("data")), parameters)
