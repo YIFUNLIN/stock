@@ -24,12 +24,19 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
     csv_path = f'{base_path}{stock_num}.csv'
     tz_taipei = pytz.timezone('Asia/Taipei')
 
+    # 計算結束時間 (夜間測試模式: 設置為昨日日期)
+    current_time = datetime.now(tz_taipei)
+    if current_time.hour < 9:  # 如果當前時間是凌晨 (0:00-09:00)
+        print(f"Night test mode: Adjusting end_date to previous day for {stock_num}")
+        end_date = (current_time - timedelta(days=1)).replace(hour=23, minute=59, second=59)
+    else:
+        end_date = current_time - timedelta(hours=2)  # 減去2小時的緩衝時間
+
     # 計算開始時間
     if os.path.exists(csv_path):
         clean_csv(csv_path)
         data = pd.read_csv(csv_path)
         if not data.empty:
-            # 修正警告：加上 utc=True
             data['Datetime'] = pd.to_datetime(data['Datetime'], errors='coerce', utc=True)
             data.dropna(subset=['Datetime'], inplace=True)  # 移除無效日期行
             data.set_index('Datetime', inplace=True)
@@ -37,12 +44,9 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
             last_record_date = data.index[-1]
             start_date = last_record_date + timedelta(days=1)
         else:
-            start_date = datetime.now(tz_taipei) - timedelta(days=90)  # 預設抓取最近90天
+            start_date = end_date - timedelta(days=90)  # 預設抓取最近90天
     else:
-        start_date = datetime.now(tz_taipei) - timedelta(days=90)
-
-    # 計算結束日期
-    end_date = datetime.now(tz_taipei) - timedelta(hours=2)  # 減去2小時的緩衝時間
+        start_date = end_date - timedelta(days=90)
 
     # 修正日期範圍問題
     if start_date > end_date:
@@ -67,7 +71,6 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
         print(f"No new data for {stock_num}. Ensure the data source is up-to-date.")
         return
 
-    # 確保 'Datetime' 列存在
     if 'Datetime' not in new_data.columns:
         print(f"'Datetime' column missing for {stock_num}. Skipping.")
         return
@@ -77,7 +80,6 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
     new_data['Datetime'] = new_data['Datetime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Taipei')  # 處理時區
     new_data.drop_duplicates(subset=['Datetime'], inplace=True)  # 移除重複數據
 
-    # 確保數據有有效的行數
     if new_data.empty:
         print(f"No valid data rows for {stock_num}. Skipping.")
         return
@@ -95,7 +97,6 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
 # 主程式
 if __name__ == "__main__":
     for k, v in codes.items():
-        # 僅處理上市的股票和 ETF
         if v.market == '上市' and (v.type == '股票' or v.type == 'ETF'):
             print(f"Fetching data for {k} ({v.name})...")
             try:
