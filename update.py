@@ -44,6 +44,11 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
     # 計算結束日期
     end_date = datetime.now(tz_taipei) - timedelta(hours=2)  # 減去2小時的緩衝時間
 
+    # 如果 start_date 大於 end_date，跳過該股票
+    if start_date > end_date:
+        print(f"Invalid date range for {stock_num}: Start date {start_date} is after end date {end_date}")
+        return
+
     # 從 Yahoo Finance 下載數據
     try:
         yf_data = vbt.YFData.download(
@@ -59,13 +64,23 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
 
     new_data = yf_data.get()
     if new_data.empty:
-        print(f"No new data for {stock_num}")
+        print(f"No new data for {stock_num}. Ensure the data source is up-to-date.")
+        return
+
+    # 確保 'Datetime' 列存在
+    if 'Datetime' not in new_data.columns:
+        print(f"'Datetime' column missing for {stock_num}")
         return
 
     # 數據處理
     new_data.reset_index(inplace=True)
     new_data['Datetime'] = new_data['Datetime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Taipei')  # 處理時區
     new_data.drop_duplicates(subset=['Datetime'], inplace=True)  # 移除重複數據
+
+    # 確保數據有有效的行數
+    if new_data.empty:
+        print(f"No valid data rows for {stock_num}. Skipping.")
+        return
 
     # 寫入或更新 CSV
     if os.path.exists(csv_path):
@@ -80,6 +95,10 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
 # 主程式
 if __name__ == "__main__":
     for k, v in codes.items():
+        # 僅處理上市的股票和 ETF
         if v.market == '上市' and (v.type == '股票' or v.type == 'ETF'):
             print(f"Fetching data for {k} ({v.name})...")
-            get_data_since_last_record(k)
+            try:
+                get_data_since_last_record(k)
+            except Exception as e:
+                print(f"Skipping {k} ({v.name}) due to an error: {e}")
