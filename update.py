@@ -63,16 +63,22 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
             missing_index='drop'
         )
     except Exception as e:
-        print(f"Error fetching data for {stock_num}: {e}")
+        print(f"Error fetching data for {stock_num}: {e}. Possibly delisted or invalid ticker.")
         return
 
-    new_data = yf_data.get()
+    # 驗證 API 返回數據
+    try:
+        new_data = yf_data.get()
+    except Exception as e:
+        print(f"Failed to process data for {stock_num}: {e}")
+        return
+
     if new_data.empty:
         print(f"No new data for {stock_num}. Ensure the data source is up-to-date.")
         return
 
     if 'Datetime' not in new_data.columns:
-        print(f"'Datetime' column missing for {stock_num}. Skipping.")
+        print(f"'Datetime' column missing for {stock_num}. Data received: {new_data.head()}")
         return
 
     # 數據處理
