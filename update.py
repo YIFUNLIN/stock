@@ -40,7 +40,13 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
             data['Datetime'] = pd.to_datetime(data['Datetime'], errors='coerce', utc=True)
             data.dropna(subset=['Datetime'], inplace=True)  # 移除無效日期行
             data.set_index('Datetime', inplace=True)
-            data.index = data.index.tz_convert(tz_taipei)  # 將 UTC 轉換為台北時間
+
+            # 檢查是否已有時區，並進行正確的轉換
+            if data.index.tz is None:
+                data.index = data.index.tz_localize('UTC').tz_convert(tz_taipei)
+            else:
+                data.index = data.index.tz_convert(tz_taipei)
+
             last_record_date = data.index[-1]
             start_date = last_record_date + timedelta(days=1)
         else:
@@ -84,7 +90,7 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
 
     # 處理時區
     new_data['Datetime'] = pd.to_datetime(new_data['Datetime'], errors='coerce', utc=True)
-    new_data['Datetime'] = new_data['Datetime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Taipei')
+    new_data['Datetime'] = new_data['Datetime'].dt.tz_convert('Asia/Taipei')
     new_data.drop_duplicates(subset=['Datetime'], inplace=True)  # 移除重複數據
 
     if new_data.empty:
