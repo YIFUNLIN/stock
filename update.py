@@ -44,10 +44,10 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
     # 計算結束日期
     end_date = datetime.now(tz_taipei) - timedelta(hours=2)  # 減去2小時的緩衝時間
 
-    # 如果 start_date 大於 end_date，跳過該股票
+    # 修正日期範圍問題
     if start_date > end_date:
-        print(f"Invalid date range for {stock_num}: Start date {start_date} is after end date {end_date}")
-        return
+        print(f"Invalid date range for {stock_num}: Start date {start_date} is after end date {end_date}. Adjusting start_date.")
+        start_date = end_date - timedelta(days=1)
 
     # 從 Yahoo Finance 下載數據
     try:
@@ -69,7 +69,7 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
 
     # 確保 'Datetime' 列存在
     if 'Datetime' not in new_data.columns:
-        print(f"'Datetime' column missing for {stock_num}")
+        print(f"'Datetime' column missing for {stock_num}. Skipping.")
         return
 
     # 數據處理
