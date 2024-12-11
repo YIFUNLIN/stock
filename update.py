@@ -77,13 +77,14 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
         print(f"No new data for {stock_num}. Ensure the data source is up-to-date.")
         return
 
+    # 將索引 Date 提取為 Datetime 欄位
     if 'Datetime' not in new_data.columns:
-        print(f"'Datetime' column missing for {stock_num}. Data received: {new_data.head()}")
-        return
+        new_data.reset_index(inplace=True)
+        new_data.rename(columns={'Date': 'Datetime'}, inplace=True)
 
-    # 數據處理
-    new_data.reset_index(inplace=True)
-    new_data['Datetime'] = new_data['Datetime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Taipei')  # 處理時區
+    # 處理時區
+    new_data['Datetime'] = pd.to_datetime(new_data['Datetime'], errors='coerce', utc=True)
+    new_data['Datetime'] = new_data['Datetime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Taipei')
     new_data.drop_duplicates(subset=['Datetime'], inplace=True)  # 移除重複數據
 
     if new_data.empty:
