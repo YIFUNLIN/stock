@@ -29,15 +29,17 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
         clean_csv(csv_path)
         data = pd.read_csv(csv_path)
         if not data.empty:
-            data['Datetime'] = pd.to_datetime(data['Datetime'], errors='coerce')
+            # 修正警告：加上 utc=True
+            data['Datetime'] = pd.to_datetime(data['Datetime'], errors='coerce', utc=True)
             data.dropna(subset=['Datetime'], inplace=True)  # 移除無效日期行
             data.set_index('Datetime', inplace=True)
+            data.index = data.index.tz_convert(tz_taipei)  # 將 UTC 轉換為台北時間
             last_record_date = data.index[-1]
             start_date = last_record_date + timedelta(days=1)
         else:
-            start_date = datetime.now(tz_taipei) - timedelta(days=60)
+            start_date = datetime.now(tz_taipei) - timedelta(days=90)  # 預設抓取最近90天
     else:
-        start_date = datetime.now(tz_taipei) - timedelta(days=60)
+        start_date = datetime.now(tz_taipei) - timedelta(days=90)
 
     # 計算結束日期
     end_date = datetime.now(tz_taipei) - timedelta(hours=2)  # 減去2小時的緩衝時間
@@ -49,13 +51,11 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
             start=start_date,
             end=end_date,
             interval='1d',
-            missing_index='drop',
-            timezone='Asia/Taipei'
+            missing_index='drop'
         )
     except Exception as e:
         print(f"Error fetching data for {stock_num}: {e}")
         return
-    
 
     new_data = yf_data.get()
     if new_data.empty:
@@ -64,7 +64,7 @@ def get_data_since_last_record(stock_num, base_path='./data/'):
 
     # 數據處理
     new_data.reset_index(inplace=True)
-    new_data['Datetime'] = new_data['Datetime'].dt.tz_convert('Asia/Taipei')
+    new_data['Datetime'] = new_data['Datetime'].dt.tz_localize('UTC').dt.tz_convert('Asia/Taipei')  # 處理時區
     new_data.drop_duplicates(subset=['Datetime'], inplace=True)  # 移除重複數據
 
     # 寫入或更新 CSV
