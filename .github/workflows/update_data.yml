@@ -2,7 +2,7 @@ name: Update Data
 
 on:
   schedule:
-    - cron: "0 6 * * *" # 每天UTC時間6點執行，即UTC+8時間下午2點 github actions會自動觸發。實際上好像14:20才自動更新
+    - cron: "0 22 * * *" # UTC 時間每天 22:00，即台灣時間早上 6:00
   workflow_dispatch: # 允許手動觸發
 jobs:
   update-and-commit:
