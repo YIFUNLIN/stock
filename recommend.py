@@ -51,7 +51,7 @@ def generate_report(urls, parameters, limit=30):
                     "Stock": url.split('/')[-1].split('.')[0],
                     "Should_Buy": should_buy,
                     "Should_Sell": should_sell,
-                    "Recommended_Price": today_close_price,
+                    "Close_Price": today_close_price,
                     "Total_Gains": total_gains,
                     "Sharpe_Ratio": sharpe_ratio,
                 })
