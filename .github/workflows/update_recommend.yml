@@ -2,75 +2,69 @@ name: Update Recommend_sys
 
 on:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 0 * * *"   # 每天 0 點執行
   workflow_dispatch:
 
 jobs:
   update-and-commit:
     runs-on: ubuntu-latest
     steps:
+      # 1. 先檢出程式碼
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           
+      # 2. 設定 Python 版本
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
           
-      - name: Install system dependencies
+      # 3. 一次搞定：安裝 TA-Lib (C庫) + Python ta-lib
+      - name: Install TA-Lib and Python deps
         run: |
+          # 安裝系統工具
           sudo apt-get update
           sudo apt-get install -y wget build-essential
-
-      - name: Install TA-Lib from source
-        run: |
+          
+          # 下載並安裝 TA-Lib (C原始碼)
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
           tar -xzf ta-lib-0.4.0-src.tar.gz
-          cd ta-lib/
-          ./configure
+          cd ta-lib
+          ./configure --prefix=/usr/local
           make
           sudo make install
           cd ..
           rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
-
-          # 讓系統知道 /usr/local/lib 中的動態庫
+          
+          # 讓 linker 知道 /usr/local/lib
           echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/ta-lib.conf
           sudo ldconfig
-
-      - name: Verify TA-Lib library
-        run: |
-          echo "Check installed ta-lib in /usr/local/lib:"
-          ls -l /usr/local/lib | grep ta_lib
-          echo "Check ldconfig cache:"
-          ldconfig -p | grep ta_lib
-
-      - name: Set environment variables
-        run: |
-          echo "LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH" >> $GITHUB_ENV
-          echo "C_INCLUDE_PATH=/usr/local/include:$C_INCLUDE_PATH" >> $GITHUB_ENV
-
-      - name: Install Python packages
-        # 注意: 這些環境變數會自動被繼承, 不需要再 source
-        run: |
+          
+          # 安裝 Python 專案需要的套件
           python -m pip install --upgrade pip wheel setuptools
           pip install numpy==1.23.5
-          # 加上 --verbose 可以看到更多錯誤資訊
-          pip install --verbose ta-lib
+          
+          # 關鍵：在同一個 shell 裡指定 LDFLAGS/CPPFLAGS 安裝 ta-lib (Python)
+          LDFLAGS="-L/usr/local/lib" CPPFLAGS="-I/usr/local/include" \
+            pip install --no-cache-dir --verbose ta-lib
+          
+          # 安裝你專案的其餘依賴
           pip install -r requirements.txt
           
-      - name: Verify TA-Lib installation
-        run: |
+          # 驗證 TA-Lib 是否能正常 import
           python -c "import talib; print('TA-Lib installation successful')"
-          
+
+      # 4. Pull 你的 main 分支，避免與遠端衝突
       - name: Pull changes from remote
         run: git pull origin main
         
+      # 5. 執行更新程式
       - name: Update data
         run: python recommend.py
         
+      # 6. 若有變更就 Commit & Push
       - name: Commit and push if changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
