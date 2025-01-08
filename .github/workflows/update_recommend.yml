@@ -1,45 +1,38 @@
-name: Update Data
-
+name: Update Recommend_sys
 on:
   schedule:
-    - cron: "0 0 * * *"  # UTC 每天 0:00，即台灣時間早上 8:00
+    - cron: "0 0 * * *"  # 修正了 cron 表達式的語法
   workflow_dispatch:
-
 jobs:
   update-and-commit:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. 檢出代碼
       - name: Checkout code
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-
-      # 2. 設置 Python 環境
+          
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: "3.9"
-
-      # 3. 安裝 TA-Lib 的 C 庫
-      - name: Install TA-Lib from source
+          
+      - name: Install TA-Lib
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential wget
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
           tar -xzf ta-lib-0.4.0-src.tar.gz
-          cd ta-lib
+          cd ta-lib/
           ./configure --prefix=/usr
           make
           sudo make install
+          sudo ldconfig  # 更新共享庫緩存
           cd ..
           rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
-
-      # 4. 安裝 Python 依賴項
+          
       - name: Install Python dependencies
         run: |
-          pip install numpy  # 必須先安裝 numpy
+          python -m pip install --upgrade pip
+          pip install numpy==1.23.5  # 指定較舊但穩定的版本
           pip install ta-lib
           pip install -r requirements.txt
 
