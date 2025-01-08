@@ -3,12 +3,9 @@ import pandas as pd
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
 from sklearn.preprocessing import MinMaxScaler
-import talib as ta
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
-from dotenv import load_dotenv
 
-load_dotenv()
 
 # 計算夏普比率: 衡量投資組合風險調整後收益的指標。   夏普比率越高，代表單位風險下的回報越高
 def calculate_sharpe_ratio(returns, risk_free_rate=0.01):
@@ -27,12 +24,27 @@ def calculate_max_drawdown(portfolio_values):
         drawdown = (peak - value) / peak
     return max(drawdowns)
 
+def calculate_rsi(prices, timeperiod=14):
+    delta = prices.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=timeperiod).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=timeperiod).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+def calculate_macd(prices, fastperiod=12, slowperiod=26, signalperiod=9):
+    ema_fast = prices.ewm(span=fastperiod, adjust=False).mean()
+    ema_slow = prices.ewm(span=slowperiod, adjust=False).mean()
+    macd = ema_fast - ema_slow
+    signal = macd.ewm(span=signalperiod, adjust=False).mean()
+    return macd, signal
+
 # 添加技術指標: 基於股票價格和交易量計算的指標，用於輔助交易決策
 def add_technical_indicators(df):
-    df['MA5'] = df['close'].rolling(window=5).mean()  # 判斷趨勢
-    df['MA20'] = df['close'].rolling(window=20).mean()  
-    df['RSI'] = ta.RSI(df['close'].values, timeperiod=14) # 判斷超買超賣
-    df['MACD'], df['MACD_signal'], _ = ta.MACD(df['close'].values, fastperiod=12, slowperiod=26, signalperiod=9)  # 買賣訊號
+    df['MA5'] = df['close'].rolling(window=5).mean()
+    df['MA20'] = df['close'].rolling(window=20).mean()
+    df['RSI'] = calculate_rsi(df['close'], timeperiod=14)
+    df['MACD'], df['MACD_signal'] = calculate_macd(df['close'])
     df.dropna(inplace=True)
     return df
 
