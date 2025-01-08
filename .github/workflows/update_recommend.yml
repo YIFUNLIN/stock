@@ -2,7 +2,7 @@ name: Update Recommend_sys
 
 on:
   schedule:
-    - cron: "0 0 * * *"  # 每日 0 點執行
+    - cron: "0 0 * * *"  # 每天 0 點
   workflow_dispatch:
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2. 設定 Python 3.9
+      # 2. Python 3.9
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -27,19 +27,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y wget build-essential
           
-          # 下載並解壓原始碼
-          wget https://sourceforge.net/projects/ta-lib/files/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz
+          # 下載並解壓
+          wget https://sourceforge.net/projects/ta-lib/files/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz -O ta-lib-0.4.0-src.tar.gz
           tar -xzf ta-lib-0.4.0-src.tar.gz
           
-          # 編譯 & 安裝到 /usr/local
-          cd ta-lib-0.4.0-src
+          # 這裡的資料夾名稱應該是 `ta-lib-0.4.0`，非 `ta-lib-0.4.0-src`
+          cd ta-lib-0.4.0
+          
           ./configure --prefix=/usr/local
           make
           sudo make install
           cd ..
-          rm -rf ta-lib-0.4.0-src ta-lib-0.4.0-src.tar.gz
+          rm -rf ta-lib-0.4.0 ta-lib-0.4.0-src.tar.gz
           
-          # 讓 linker 知道 /usr/local/lib
+          # 更新 linker cache
           echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/ta-lib.conf
           sudo ldconfig
 
@@ -49,23 +50,23 @@ jobs:
           # 升級 pip setuptools wheel
           python -m pip install --upgrade pip setuptools wheel
           
-          # 安裝指定舊版 Numpy & Cython (供 ta-lib 編譯用)
+          # 安裝特定舊版 Numpy & Cython (供 ta-lib 編譯)
           pip install numpy==1.23.5 cython
           
-          # 關鍵：指定 --no-build-isolation 避免在隔離環境安裝到更高版的 numpy
+          # 關鍵：--no-build-isolation 避免隔離環境拉到更高版 numpy
           pip install ta-lib --no-build-isolation --verbose
           
           # 安裝你專案中需要的其餘套件
           pip install -r requirements.txt
           
-          # 驗證能否正常 import
+          # 確認能正常 import
           python -c "import talib; print('TA-Lib installation successful')"
 
-      # 5. Pull 變更，避免跟遠端衝突
+      # 5. Pull 變更，避免衝突
       - name: Pull changes from remote
         run: git pull origin main
 
-      # 6. 執行你的 recommend.py
+      # 6. 執行程式
       - name: Update data
         run: python recommend.py
 
