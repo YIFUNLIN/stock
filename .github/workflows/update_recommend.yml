@@ -21,6 +21,7 @@ jobs:
         with:
           python-version: "3.9"
 
+      # 手动安装 TA-Lib 依赖
       - name: Install TA-Lib from source
         run: |
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
@@ -30,9 +31,11 @@ jobs:
           make
           sudo make install
 
+      # 安装 Python 依赖
       - name: Install dependencies
         run: |
           pip install numpy  # TA-Lib requires numpy
+          pip install ta-lib
           pip install -r requirements.txt
 
       - name: Pull changes from remote
