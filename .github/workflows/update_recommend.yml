@@ -2,9 +2,8 @@ name: Update Data
 
 on:
   schedule:
-    # UTC 時間每天 0:00，即台灣時間早上 8:00
-    - cron: "0 0 * * *"
-  workflow_dispatch: # 允許手動觸發
+    - cron: "0 0 * * *"  # UTC 每天 0:00，即台灣時間早上 8:00
+  workflow_dispatch:
 
 jobs:
   update-and-commit:
@@ -26,12 +25,16 @@ jobs:
       # 3. 安裝 TA-Lib 的 C 庫
       - name: Install TA-Lib from source
         run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential wget
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
           tar -xzf ta-lib-0.4.0-src.tar.gz
           cd ta-lib
           ./configure --prefix=/usr
           make
           sudo make install
+          cd ..
+          rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
 
       # 4. 安裝 Python 依賴項
       - name: Install Python dependencies
