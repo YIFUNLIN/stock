@@ -1,7 +1,7 @@
 name: Update Recommend_sys
 on:
   schedule:
-    - cron: "0 0 * * *"  # 修正了 cron 表達式的語法
+    - cron: "0 0 * * *"
   workflow_dispatch:
 jobs:
   update-and-commit:
@@ -17,22 +17,25 @@ jobs:
         with:
           python-version: "3.9"
           
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget build-essential
+
       - name: Install TA-Lib
         run: |
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
           tar -xzf ta-lib-0.4.0-src.tar.gz
           cd ta-lib/
-          ./configure --prefix=/usr
+          ./configure
           make
           sudo make install
-          sudo ldconfig  # 更新共享庫緩存
           cd ..
-          rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
           
-      - name: Install Python dependencies
+      - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install numpy==1.23.5  # 指定較舊但穩定的版本
+          pip install numpy==1.23.5
           pip install ta-lib
           pip install -r requirements.txt
 
