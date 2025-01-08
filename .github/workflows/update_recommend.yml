@@ -3,6 +3,7 @@ on:
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
+
 jobs:
   update-and-commit:
     runs-on: ubuntu-latest
@@ -24,30 +25,39 @@ jobs:
 
       - name: Install TA-Lib
         run: |
+          # 下載並解壓 TA-Lib
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
           tar -xzf ta-lib-0.4.0-src.tar.gz
           cd ta-lib/
-          ./configure
+          ./configure --prefix=/usr
           make
           sudo make install
           cd ..
+          # 確保系統能找到 TA-Lib 庫
+          sudo ldconfig
+          # 驗證安裝
+          ls -l /usr/lib/libta_lib*
+          
+      - name: Set TA-Lib environment variables
+        run: |
+          echo "LD_LIBRARY_PATH=/usr/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "TA_LIBRARY_PATH=/usr/lib" >> $GITHUB_ENV
+          echo "TA_INCLUDE_PATH=/usr/include" >> $GITHUB_ENV
           
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
           pip install numpy==1.23.5
-          pip install ta-lib
+          # 使用 verbose 模式安裝 ta-lib 以獲得更多錯誤信息
+          pip install --verbose ta-lib
           pip install -r requirements.txt
-
-      # 5. 從遠端拉取更改
+          
       - name: Pull changes from remote
         run: git pull origin main
-
-      # 6. 更新數據
+        
       - name: Update data
         run: python recommend.py
-
-      # 7. 如果有更改則提交
+        
       - name: Commit and push if changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
