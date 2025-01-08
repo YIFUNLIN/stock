@@ -2,69 +2,74 @@ name: Update Recommend_sys
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # 每天 0 點執行
+    - cron: "0 0 * * *"  # 每日 0 點執行
   workflow_dispatch:
 
 jobs:
   update-and-commit:
     runs-on: ubuntu-latest
     steps:
-      # 1. 先檢出程式碼
+      # 1. 檢出程式碼
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          
-      # 2. 設定 Python 版本
+
+      # 2. 設定 Python 3.9
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
-          
-      # 3. 一次搞定：安裝 TA-Lib (C庫) + Python ta-lib
-      - name: Install TA-Lib and Python deps
+
+      # 3. 下載 & 安裝 TA-Lib (C 原始碼)
+      - name: Build & Install TA-Lib (C lib)
         run: |
-          # 安裝系統工具
           sudo apt-get update
           sudo apt-get install -y wget build-essential
           
-          # 下載並安裝 TA-Lib (C原始碼)
-          wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+          # 下載並解壓原始碼
+          wget https://sourceforge.net/projects/ta-lib/files/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz
           tar -xzf ta-lib-0.4.0-src.tar.gz
-          cd ta-lib
+          
+          # 編譯 & 安裝到 /usr/local
+          cd ta-lib-0.4.0-src
           ./configure --prefix=/usr/local
           make
           sudo make install
           cd ..
-          rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
+          rm -rf ta-lib-0.4.0-src ta-lib-0.4.0-src.tar.gz
           
           # 讓 linker 知道 /usr/local/lib
           echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/ta-lib.conf
           sudo ldconfig
+
+      # 4. 安裝 Python 版 ta-lib & 其餘依賴
+      - name: Install Python packages
+        run: |
+          # 升級 pip setuptools wheel
+          python -m pip install --upgrade pip setuptools wheel
           
-          # 安裝 Python 專案需要的套件
-          python -m pip install --upgrade pip wheel setuptools
-          pip install numpy==1.23.5
+          # 安裝指定舊版 Numpy & Cython (供 ta-lib 編譯用)
+          pip install numpy==1.23.5 cython
           
-          # 關鍵：在同一個 shell 裡指定 LDFLAGS/CPPFLAGS 安裝 ta-lib (Python)
-          LDFLAGS="-L/usr/local/lib" CPPFLAGS="-I/usr/local/include" \
-            pip install --no-cache-dir --verbose ta-lib
+          # 關鍵：指定 --no-build-isolation 避免在隔離環境安裝到更高版的 numpy
+          pip install ta-lib --no-build-isolation --verbose
           
-          # 安裝你專案的其餘依賴
+          # 安裝你專案中需要的其餘套件
           pip install -r requirements.txt
           
-          # 驗證 TA-Lib 是否能正常 import
+          # 驗證能否正常 import
           python -c "import talib; print('TA-Lib installation successful')"
 
-      # 4. Pull 你的 main 分支，避免與遠端衝突
+      # 5. Pull 變更，避免跟遠端衝突
       - name: Pull changes from remote
         run: git pull origin main
-        
-      # 5. 執行更新程式
+
+      # 6. 執行你的 recommend.py
       - name: Update data
         run: python recommend.py
-        
-      # 6. 若有變更就 Commit & Push
+
+      # 7. 若有變更就 commit & push
       - name: Commit and push if changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
