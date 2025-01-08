@@ -11,17 +11,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. 檢出代碼
       - name: Checkout code
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
+      # 2. 設置 Python 環境
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: "3.9"
 
-      # 手动安装 TA-Lib 依赖
+      # 3. 安裝 TA-Lib 的 C 庫
       - name: Install TA-Lib from source
         run: |
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
@@ -31,19 +33,22 @@ jobs:
           make
           sudo make install
 
-      # 安装 Python 依赖
-      - name: Install dependencies
+      # 4. 安裝 Python 依賴項
+      - name: Install Python dependencies
         run: |
-          pip install numpy  # TA-Lib requires numpy
+          pip install numpy  # 必須先安裝 numpy
           pip install ta-lib
           pip install -r requirements.txt
 
+      # 5. 從遠端拉取更改
       - name: Pull changes from remote
         run: git pull origin main
 
+      # 6. 更新數據
       - name: Update data
         run: python recommend.py
 
+      # 7. 如果有更改則提交
       - name: Commit and push if changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
