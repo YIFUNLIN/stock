@@ -25,32 +25,45 @@ jobs:
 
       - name: Install TA-Lib
         run: |
-          # 下載並解壓 TA-Lib
+          # 下載並安裝 TA-Lib
           wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
           tar -xzf ta-lib-0.4.0-src.tar.gz
           cd ta-lib/
-          ./configure --prefix=/usr
+          ./configure
           make
           sudo make install
-          cd ..
-          # 確保系統能找到 TA-Lib 庫
+          
+          # 特別注意：複製庫文件到標準位置
+          sudo cp /usr/local/lib/libta_lib.so.0 /usr/lib
+          sudo cp /usr/local/lib/libta_lib.so.0.0.0 /usr/lib
+          sudo cp /usr/local/lib/libta_lib.so /usr/lib
+          sudo cp /usr/local/lib/libta_lib.la /usr/lib
+          sudo cp /usr/local/lib/libta_lib.a /usr/lib
+          
+          # 更新庫緩存
           sudo ldconfig
+          
           # 驗證安裝
           ls -l /usr/lib/libta_lib*
           
+          cd ..
+          rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
+          
       - name: Set TA-Lib environment variables
         run: |
-          echo "LD_LIBRARY_PATH=/usr/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "TA_LIBRARY_PATH=/usr/lib" >> $GITHUB_ENV
-          echo "TA_INCLUDE_PATH=/usr/include" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=/usr/lib:/usr/local/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
           
       - name: Install Python packages
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip wheel setuptools
           pip install numpy==1.23.5
           # 使用 verbose 模式安裝 ta-lib 以獲得更多錯誤信息
-          pip install --verbose ta-lib
+          LIBRARY_PATH=/usr/lib C_INCLUDE_PATH=/usr/include pip install --verbose ta-lib
           pip install -r requirements.txt
+          
+      - name: Verify TA-Lib installation
+        run: |
+          python -c "import talib; print('TA-Lib installation successful')"
           
       - name: Pull changes from remote
         run: git pull origin main
