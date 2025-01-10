@@ -9,5 +9,5 @@ requests
 nlp2
 tensorflow
 numpy
-lightgbm
+xgboost
 scikit-learn
