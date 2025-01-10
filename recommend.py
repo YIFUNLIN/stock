@@ -2,9 +2,9 @@ import nlp2
 import pandas as pd
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+import lightgbm as lgb
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 
 # 計算夏普比率: 衡量投資組合風險調整後收益的指標。   夏普比率越高，代表單位風險下的回報越高
@@ -39,13 +39,13 @@ def calculate_macd(prices, fastperiod=12, slowperiod=26, signalperiod=9):
     signal = macd.ewm(span=signalperiod, adjust=False).mean()
     return macd, signal
 
-# 添加技術指標: 基於股票價格和交易量計算的指標，用於輔助交易決策
+# 修改後的 add_technical_indicators，支持批量處理並節省時間
 def add_technical_indicators(df):
     df['MA5'] = df['close'].rolling(window=5).mean()
     df['MA20'] = df['close'].rolling(window=20).mean()
     df['RSI'] = calculate_rsi(df['close'], timeperiod=14)
     df['MACD'], df['MACD_signal'] = calculate_macd(df['close'])
-    df.dropna(inplace=True)
+    df.dropna(inplace=True)  # 丟棄缺失值
     return df
 
 def calculate_markov_chain(data):
@@ -81,32 +81,38 @@ def calculate_markov_chain(data):
     return transition_matrix, states[-1]  # 返回轉移矩陣和最後的狀態
 
 
-# 構建和訓練LSTM模型: 預測未來的收盤價格，為交易策略提供支持
-def build_and_train_lstm_model(data, time_steps=60):
-    # 準備數據
-    scaler = MinMaxScaler(feature_range=(0, 1))  # 數據標準化到 [0, 1] 範圍
-    scaled_data = scaler.fit_transform(data)
+# 構建和訓練 LightGBM 模型
+def build_and_train_lgbm_model(data, features, time_steps):
+    # 生成目標變量（預測次日漲跌：漲為1，跌為0）
+    data['target'] = (data['close'].shift(-1) > data['close']).astype(int)
+    data.dropna(inplace=True)
 
-    X, y = [], []
-    for i in range(time_steps, len(scaled_data)):
-        X.append(scaled_data[i-time_steps:i])
-        y.append(scaled_data[i, 0])  # 預測收盤價
+    # 提取特徵與目標
+    X = data[features]
+    y = data['target']
 
-    X, y = np.array(X), np.array(y)
+    # 分割數據集
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # 構建模型: 兩層 LSTM，用於捕捉時間序列特徵
-    model = Sequential()
-    model.add(LSTM(units=50, return_sequences=True, input_shape=(X.shape[1], X.shape[2])))
-    model.add(Dropout(0.2))
-    model.add(LSTM(units=50))
-    model.add(Dropout(0.2))
-    model.add(Dense(units=1))
-    model.compile(optimizer='adam', loss='mean_squared_error')
+    # LightGBM 模型
+    model = lgb.LGBMClassifier(
+        boosting_type='gbdt',
+        n_estimators=100,
+        learning_rate=0.05,
+        max_depth=5,
+        num_leaves=31,
+        random_state=42
+    )
+    model.fit(X_train, y_train)
 
-    # 訓練模型
-    model.fit(X, y, epochs=5, batch_size=32, verbose=0)  # 減少epochs，加快訓練速度
+    # 評估模型準確率
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"LightGBM Model Accuracy: {accuracy:.2f}")
 
-    return model, scaler
+    return model
+
+
 
 # 股票推薦函數
 def recommend_stock(url, parameters):
@@ -119,29 +125,21 @@ def recommend_stock(url, parameters):
     df['close'] = pd.to_numeric(df['close'], errors='coerce')
     df['volume'] = pd.to_numeric(df['volume'], errors='coerce')
 
-    # Dataframe中，會多技術指標的欄位MA5, MA20, RSI, MACD, 和 MACD_signal
+    # 添加技術指標
     df = add_technical_indicators(df)
 
     # 確保有足夠的數據進行預測
     if len(df) < 100:
         return None
 
-    # 構建和訓練模型
-    features = ['close', 'MA5', 'MA20', 'RSI', 'MACD', 'MACD_signal']
-    data = df[features].values
-    lstm_model, scaler = build_and_train_lstm_model(data, time_steps=parameters['time_steps'])
+    # 特徵選擇
+    features = ['MA5', 'MA20', 'RSI', 'MACD', 'MACD_signal']
+
+    # 構建並訓練 LightGBM 模型
+    lgbm_model = build_and_train_lgbm_model(df, features, time_steps=parameters['time_steps'])
 
     # 預測未來價格
-    scaled_data = scaler.transform(data)
-    X = []
-    for i in range(parameters['time_steps'], len(scaled_data)):
-        X.append(scaled_data[i-parameters['time_steps']:i])
-    X = np.array(X)
-
-    predictions = lstm_model.predict(X, verbose=0)
-    predictions = scaler.inverse_transform(
-        np.hstack([predictions, np.zeros((predictions.shape[0], scaled_data.shape[1] - 1))])
-    )[:, 0]
+    df['predicted'] = lgbm_model.predict(df[features])
 
     # 計算馬可夫鏈
     transition_matrix, current_state = calculate_markov_chain(df['close'].values)
@@ -154,9 +152,9 @@ def recommend_stock(url, parameters):
     states_sell = []
     sharpe_threshold = 1.0  # Sharpe Ratio 的最低要求
 
-    for i in range(len(predictions)):
-        current_price = df['close'].iloc[parameters['time_steps'] + i]
-        predicted_price = predictions[i]
+    for i in range(len(df) - parameters['time_steps']):
+        current_price = df['close'].iloc[i + parameters['time_steps']]
+        predicted_class = df['predicted'].iloc[i + parameters['time_steps']]
 
         # 計算暫時的 Sharpe Ratio
         portfolio_value = money + holdings * current_price
@@ -169,24 +167,24 @@ def recommend_stock(url, parameters):
         prob_down = transition_matrix[current_state]['Down']
 
         # 買入策略
-        if predicted_price > current_price and temp_sharpe > sharpe_threshold and prob_up > prob_down:
+        if predicted_class == 1 and temp_sharpe > sharpe_threshold and prob_up > prob_down:
             if money >= current_price * parameters['max_buy']:
                 buy_amount = parameters['max_buy']
                 money -= current_price * buy_amount * (1 + parameters['transaction_fee_percent'] + parameters['slippage_percent'])
                 holdings += buy_amount
-                states_buy.append(parameters['time_steps'] + i)
+                states_buy.append(i + parameters['time_steps'])
 
         # 賣出策略
-        elif predicted_price < current_price and temp_sharpe > sharpe_threshold and prob_down > prob_up:
+        elif predicted_class == 0 and temp_sharpe > sharpe_threshold and prob_down > prob_up:
             if holdings >= parameters['max_sell']:
                 sell_amount = parameters['max_sell']
                 money += current_price * sell_amount * (1 - parameters['transaction_fee_percent'] - parameters['slippage_percent'])
                 holdings -= sell_amount
-                states_sell.append(parameters['time_steps'] + i)
+                states_sell.append(i + parameters['time_steps'])
 
         # 更新馬可夫鏈的當前狀態
         if i + parameters['time_steps'] < len(df['close']) - 1:
-            next_price = df['close'].iloc[parameters['time_steps'] + i + 1]
+            next_price = df['close'].iloc[i + parameters['time_steps'] + 1]
             if next_price > current_price:
                 current_state = 'Up'
             elif next_price < current_price:
@@ -213,17 +211,23 @@ def recommend_stock(url, parameters):
 
 
 
+
 # 生成報告函數
 def generate_report(urls, parameters, limit=30):
     results = []
+    
     for url in urls:
         try:
+            # 調用 recommend_stock 函數
             recommendation = recommend_stock(url, parameters)
             if recommendation is not None:
+                # 解構推薦結果
                 should_buy, should_sell, today_close_price, total_gains, invest, sharpe_ratio, max_drawdown = recommendation
+                
+                # 僅保留有買入或賣出信號的股票
                 if should_sell or should_buy:
                     results.append({
-                        "Stock": url.split('/')[-1].split('.')[0],
+                        "Stock": url.split('/')[-1].split('.')[0],  # 從文件名提取股票名稱
                         "Should_Buy": should_buy,
                         "Should_Sell": should_sell,
                         "Close_Price": today_close_price,
@@ -234,17 +238,28 @@ def generate_report(urls, parameters, limit=30):
                     })
         except Exception as e:
             print(f"Error processing {url}: {e}")
-            pass
+            continue  # 確保單支股票出錯不影響整個報告生成
 
+    # 根據總收益進行排序，僅保留前 limit 項
     sorted_results = sorted(results, key=lambda x: x['Total_Gains'], reverse=True)[:limit]
     
-    # 模板渲染: 使用Jinja2 載入模板文件(stock_report_template.html)進行渲染，生成出新的報告(stock_report.html)
-    env = Environment(loader=FileSystemLoader('templates'))
-    template = env.get_template('stock_report_template.html')
-    html_output = template.render(stocks=sorted_results)
+    if not sorted_results:
+        print("No results to generate report. Please check your input data or model.")
+        return
 
-    with open('stock_report.html', 'w', encoding='utf-8') as f:
-        f.write(html_output)
+    # 渲染模板，生成 HTML 報告
+    try:
+        env = Environment(loader=FileSystemLoader('templates'))
+        template = env.get_template('stock_report_template.html')
+        html_output = template.render(stocks=sorted_results)
+
+        # 寫入文件
+        with open('stock_report.html', 'w', encoding='utf-8') as f:
+            f.write(html_output)
+        print("Report generated successfully: stock_report.html")
+    except Exception as e:
+        print(f"Error generating report: {e}")
+
 
 # 制定交易策略的參數
 parameters = {
