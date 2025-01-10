@@ -2,7 +2,7 @@ import nlp2
 import pandas as pd
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
-import lightgbm as lgb
+from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
@@ -81,8 +81,7 @@ def calculate_markov_chain(data):
     return transition_matrix, states[-1]  # 返回轉移矩陣和最後的狀態
 
 
-# 構建和訓練 LightGBM 模型
-def build_and_train_lgbm_model(data, features, time_steps):
+def build_and_train_xgboost_model(data, features, time_steps):
     # 生成目標變量（預測次日漲跌：漲為1，跌為0）
     data['target'] = (data['close'].shift(-1) > data['close']).astype(int)
     data.dropna(inplace=True)
@@ -94,21 +93,21 @@ def build_and_train_lgbm_model(data, features, time_steps):
     # 分割數據集
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # LightGBM 模型
-    model = lgb.LGBMClassifier(
-        boosting_type='gbdt',
+    # XGBoost 模型
+    model = XGBClassifier(
         n_estimators=100,
         learning_rate=0.05,
         max_depth=5,
-        num_leaves=31,
-        random_state=42
+        random_state=42,
+        use_label_encoder=False,
+        eval_metric='logloss'  # 避免警告
     )
     model.fit(X_train, y_train)
 
     # 評估模型準確率
     y_pred = model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
-    print(f"LightGBM Model Accuracy: {accuracy:.2f}")
+    print(f"XGBoost Model Accuracy: {accuracy:.2f}")
 
     return model
 
@@ -135,11 +134,11 @@ def recommend_stock(url, parameters):
     # 特徵選擇
     features = ['MA5', 'MA20', 'RSI', 'MACD', 'MACD_signal']
 
-    # 構建並訓練 LightGBM 模型
-    lgbm_model = build_and_train_lgbm_model(df, features, time_steps=parameters['time_steps'])
+    # 構建並訓練 XGBoost 模型
+    xgboost_model = build_and_train_xgboost_model(df, features, time_steps=parameters['time_steps'])
 
     # 預測未來價格
-    df['predicted'] = lgbm_model.predict(df[features])
+    df['predicted'] = xgboost_model.predict(df[features])
 
     # 計算馬可夫鏈
     transition_matrix, current_state = calculate_markov_chain(df['close'].values)
