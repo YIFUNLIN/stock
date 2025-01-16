@@ -22,7 +22,9 @@ def calculate_max_drawdown(portfolio_values):
         if value > peak:
             peak = value
         drawdown = (peak - value) / peak
-    return max(drawdowns)
+        drawdowns.append(drawdown)  # 紀錄 drawdown
+    return max(drawdowns)  # 返回最大回撤
+
 
 def calculate_rsi(prices, timeperiod=14):
     delta = prices.diff()
@@ -128,7 +130,7 @@ def recommend_stock(url, parameters):
     df = add_technical_indicators(df)
 
     # 確保有足夠的數據進行預測
-    if len(df) < 100:
+    if len(df) < 10:
         return None
 
     # 特徵選擇
